@@ -1,6 +1,12 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+interface DownloadLimits {
+    none: number;
+    monthly: number;
+    yearly: number;
+}
+
 export interface IUser extends Document {
     email: string;
     username: string;
@@ -12,6 +18,8 @@ export interface IUser extends Document {
     createdAt: Date;
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;
+    canDownloadMoreBooks(): boolean;
+    getRemainingDownloads(): number;
 }
 
 const userSchema = new Schema<IUser>({
@@ -33,7 +41,7 @@ const userSchema = new Schema<IUser>({
         type: String,
         required: [true, 'Le mot de passe est requis'],
         minlength: [8, 'Le mot de passe doit contenir au moins 8 caractères'],
-        select: false // Ne pas inclure par défaut dans les requêtes
+        select: false
     },
     profileImageUrl: {
         type: String,
@@ -56,7 +64,6 @@ const userSchema = new Schema<IUser>({
     timestamps: true
 });
 
-// Middleware pour hasher le mot de passe avant la sauvegarde
 userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) return next();
 
@@ -69,7 +76,6 @@ userSchema.pre('save', async function(next) {
     }
 });
 
-// Méthode pour comparer les mots de passe
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
     try {
         return await bcrypt.compare(candidatePassword, this.password);
@@ -78,24 +84,18 @@ userSchema.methods.comparePassword = async function(candidatePassword: string): 
     }
 };
 
-// Méthode pour vérifier si l'utilisateur peut télécharger plus de livres
-userSchema.methods.canDownloadMoreBooks = function(): boolean {
-    const limits = {
-        none: 0,
-        monthly: 3,
-        yearly: 3
-    };
-    return this.downloadedBooks < limits[this.subscriptionStatus];
+const downloadLimits: DownloadLimits = {
+    none: 0,
+    monthly: 3,
+    yearly: 3
 };
 
-// Méthode pour obtenir le nombre de téléchargements restants
+userSchema.methods.canDownloadMoreBooks = function(): boolean {
+    return this.downloadedBooks < downloadLimits[this.subscriptionStatus as keyof DownloadLimits];
+};
+
 userSchema.methods.getRemainingDownloads = function(): number {
-    const limits = {
-        none: 0,
-        monthly: 3,
-        yearly: 3
-    };
-    return Math.max(0, limits[this.subscriptionStatus] - this.downloadedBooks);
+    return Math.max(0, downloadLimits[this.subscriptionStatus as keyof DownloadLimits] - this.downloadedBooks);
 };
 
 export const User = mongoose.model<IUser>('User', userSchema); 

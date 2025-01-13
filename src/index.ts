@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -17,8 +17,8 @@ connectDB();
 // Configuration CORS
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? '*'  // En production, accepter toutes les origines
-        : 'http://localhost:3000', // En développement, uniquement localhost
+        ? '*'
+        : 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -38,7 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
 
 // Route de test
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
     res.json({
         message: 'BookReader API est en ligne !',
         endpoints: {
