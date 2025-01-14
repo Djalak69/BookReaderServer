@@ -1,69 +1,92 @@
 import { Request, Response } from 'express';
-import Book, { IBook } from '../models/Book';
+import { Book } from '../models/Book';
+import { User } from '../models/User';
+import path from 'path';
+import fs from 'fs';
 
-// Obtenir tous les livres
-export const getBooks = async (_req: Request, res: Response): Promise<void> => {
+const DOWNLOADS_PER_MONTH = 3;
+
+export const getBooks = async (req: Request, res: Response): Promise<void> => {
     try {
         const books = await Book.find();
-        res.status(200).json(books);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la récupération des livres", error });
+        res.json(books);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
     }
 };
 
-// Obtenir un livre par son ID
-export const getBookById = async (req: Request, res: Response): Promise<void> => {
+export const downloadBook = async (req: Request, res: Response): Promise<void> => {
     try {
-        const book = await Book.findById(req.params.id);
+        const userId = (req as any).user.id;
+        const bookId = req.params.id;
+
+        // Vérifier si le livre existe
+        const book = await Book.findById(bookId);
         if (!book) {
-            res.status(404).json({ message: "Livre non trouvé" });
+            res.status(404).json({ message: 'Livre non trouvé' });
             return;
         }
-        res.status(200).json(book);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la récupération du livre", error });
-    }
-};
 
-// Créer un nouveau livre
-export const createBook = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const book = new Book(req.body);
-        const savedBook = await book.save();
-        res.status(201).json(savedBook);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la création du livre", error });
-    }
-};
-
-// Mettre à jour un livre
-export const updateBook = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const book = await Book.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-        if (!book) {
-            res.status(404).json({ message: "Livre non trouvé" });
+        // Vérifier les téléchargements du mois
+        const user = await User.findById(userId);
+        if (!user) {
+            res.status(404).json({ message: 'Utilisateur non trouvé' });
             return;
         }
-        res.status(200).json(book);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la mise à jour du livre", error });
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        const monthlyDownloads = await Book.countDocuments({
+            'downloadedBy': {
+                $elemMatch: {
+                    user: userId,
+                    downloadDate: { $gte: startOfMonth }
+                }
+            }
+        });
+
+        if (monthlyDownloads >= DOWNLOADS_PER_MONTH) {
+            res.status(403).json({ 
+                message: 'Limite de téléchargements mensuels atteinte',
+                monthlyDownloads,
+                limit: DOWNLOADS_PER_MONTH
+            });
+            return;
+        }
+
+        // Vérifier si le fichier existe
+        const filePath = path.join(__dirname, '../../public', book.epubUrl);
+        if (!fs.existsSync(filePath)) {
+            res.status(404).json({ message: 'Fichier non trouvé' });
+            return;
+        }
+
+        // Mettre à jour les informations de téléchargement
+        book.downloadedBy.push({ 
+            user: userId,
+            downloadDate: new Date()
+        });
+        book.downloadCount = (book.downloadCount || 0) + 1;
+        await book.save();
+
+        // Envoyer le fichier
+        res.download(filePath);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
     }
 };
 
-// Supprimer un livre
-export const deleteBook = async (req: Request, res: Response): Promise<void> => {
+export const getUserBooks = async (req: Request, res: Response): Promise<void> => {
     try {
-        const book = await Book.findByIdAndDelete(req.params.id);
-        if (!book) {
-            res.status(404).json({ message: "Livre non trouvé" });
-            return;
-        }
-        res.status(200).json({ message: "Livre supprimé avec succès" });
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la suppression du livre", error });
+        const userId = (req as any).user.id;
+        
+        const books = await Book.find({
+            'downloadedBy.user': userId
+        });
+
+        res.json(books);
+    } catch (error: any) {
+        res.status(500).json({ message: error.message });
     }
 }; 

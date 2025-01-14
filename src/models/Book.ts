@@ -1,29 +1,66 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface IBook extends Document {
-    title: string;
-    author: string;
-    description?: string;
-    coverUrl?: string;
-    epubUrl?: string;
-    language: string;
-    publishDate?: Date;
-    addedDate: Date;
-    isDownloaded?: boolean;
-    downloadCount?: number;
-}
-
-const BookSchema: Schema = new Schema({
-    title: { type: String, required: true },
-    author: { type: String, required: true },
-    description: { type: String },
-    coverUrl: { type: String },
-    epubUrl: { type: String },
-    language: { type: String, required: true },
-    publishDate: { type: Date },
-    addedDate: { type: Date, default: Date.now },
-    isDownloaded: { type: Boolean, default: false },
-    downloadCount: { type: Number, default: 0 }
+const bookSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    author: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    description: {
+        type: String,
+        trim: true
+    },
+    language: {
+        type: String,
+        required: true,
+        default: 'fr'
+    },
+    publishDate: {
+        type: Date,
+        default: Date.now
+    },
+    addedDate: {
+        type: Date,
+        default: Date.now
+    },
+    isDownloaded: {
+        type: Boolean,
+        default: false
+    },
+    downloadCount: {
+        type: Number,
+        default: 0
+    },
+    readingProgress: {
+        type: Number,
+        default: 0
+    },
+    lastReadPosition: {
+        type: Number,
+        default: 0
+    },
+    epubUrl: {
+        type: String,
+        required: true
+    },
+    coverUrl: {
+        type: String
+    },
+    downloadedBy: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        downloadDate: {
+            type: Date,
+            default: Date.now
+        }
+    }]
 });
 
-export default mongoose.model<IBook>('Book', BookSchema); 
+export const Book = mongoose.model('Book', bookSchema); 

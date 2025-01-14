@@ -1,19 +1,18 @@
-import { Router } from 'express';
+import express from 'express';
+import { protect } from '../middleware/auth';
 import {
     getBooks,
-    getBookById,
-    createBook,
-    updateBook,
-    deleteBook
+    downloadBook,
+    getUserBooks
 } from '../controllers/bookController';
 
-const router = Router();
+const router = express.Router();
 
-// Routes pour les livres
+// Routes publiques
 router.get('/', getBooks);
-router.get('/:id', getBookById);
-router.post('/', createBook);
-router.put('/:id', updateBook);
-router.delete('/:id', deleteBook);
+
+// Routes protégées
+router.get('/user-books', protect, getUserBooks);
+router.get('/:id/download', protect, downloadBook);
 
 export default router; 
